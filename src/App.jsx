@@ -1,6 +1,86 @@
 import React, { useState, useEffect } from "react";
 
+function AuthForm({ onAuth }) {
+  const [username, setUsername] = useState("");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("gw-username");
+    if (storedUser) {
+      setIsLoggedIn(true);
+      onAuth(storedUser);
+    }
+  }, [onAuth]);
+
+  const handleLogin = () => {
+    if (username.trim()) {
+      localStorage.setItem("gw-username", username);
+      setIsLoggedIn(true);
+      onAuth(username);
+    }
+  };
+
+  if (isLoggedIn) return null;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        background: "#004d40cc",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 10,
+      }}
+    >
+      <div
+        style={{
+          background: "white",
+          padding: "2rem",
+          borderRadius: "1rem",
+          width: "300px",
+          textAlign: "center",
+          boxShadow: "0 0 20px rgba(0,0,0,0.2)",
+        }}
+      >
+        <h2 style={{ marginBottom: "1rem", color: "#00796b" }}>Login</h2>
+        <input
+          type="text"
+          placeholder="Enter Username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "0.5rem",
+            borderRadius: "0.5rem",
+            border: "1px solid #ccc",
+          }}
+        />
+        <button
+          onClick={handleLogin}
+          style={{
+            marginTop: "1rem",
+            padding: "0.5rem 1rem",
+            backgroundColor: "#00796b",
+            color: "white",
+            border: "none",
+            borderRadius: "0.5rem",
+            cursor: "pointer",
+          }}
+        >
+          Login
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function GroundWaterPrediction() {
+  const [username, setUsername] = useState(null);
   const [location, setLocation] = useState("");
   const [prediction, setPrediction] = useState("");
   const [loading, setLoading] = useState(false);
@@ -18,8 +98,7 @@ export default function GroundWaterPrediction() {
   const handleSubmit = async () => {
     if (!location) return;
     setLoading(true);
-    const prompt = `Query: ${location} next 7 days ground water level.. just give me an rough prediction need not be accurate to the tee based on recent weather rain and stuff. just use general knowledge
-    dont tell me where the fuck to find accurate data and all. its summer season in india. do what i say that alone. dont add extra things. just answer with good bad decent etc`;
+    const prompt = `Query: ${location} next 7 days ground water level.. just give me an rough prediction need not be accurate to the tee based on recent weather rain and stuff. just use general knowledge. Don't add extra things. just answer with good bad decent etc.`;
     try {
       const response = await fetch(
         "https://gemini-backend-uiuz.onrender.com/gemini",
@@ -57,6 +136,7 @@ export default function GroundWaterPrediction() {
         fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
       }}
     >
+      <AuthForm onAuth={setUsername} />
       <div style={{ maxWidth: "800px", margin: "0 auto", textAlign: "center" }}>
         <h1
           style={{
@@ -68,6 +148,11 @@ export default function GroundWaterPrediction() {
         >
           Ground Water Prediction
         </h1>
+        {username && (
+          <p style={{ color: "#004d40", marginBottom: "1rem" }}>
+            Welcome, {username}!
+          </p>
+        )}
         <div
           style={{
             background: "#ffffff",
