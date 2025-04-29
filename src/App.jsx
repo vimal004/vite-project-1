@@ -1,104 +1,63 @@
 import React, { useState, useEffect } from "react";
 
-function AuthForm({ onAuth }) {
-  const [username, setUsername] = useState("");
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem("gw-username");
-    if (storedUser) {
-      setIsLoggedIn(true);
-      onAuth(storedUser);
-    }
-  }, [onAuth]);
-
-  const handleLogin = () => {
-    if (username.trim()) {
-      localStorage.setItem("gw-username", username);
-      setIsLoggedIn(true);
-      onAuth(username);
-    }
-  };
-
-  if (isLoggedIn) return null;
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        width: "100%",
-        height: "100%",
-        background: "#004d40cc",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 10,
-      }}
-    >
-      <div
-        style={{
-          background: "white",
-          padding: "2rem",
-          borderRadius: "1rem",
-          width: "300px",
-          textAlign: "center",
-          boxShadow: "0 0 20px rgba(0,0,0,0.2)",
-        }}
-      >
-        <h2 style={{ marginBottom: "1rem", color: "#00796b" }}>Login</h2>
-        <input
-          type="text"
-          placeholder="Enter Username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          style={{
-            width: "100%",
-            padding: "0.5rem",
-            borderRadius: "0.5rem",
-            border: "1px solid #ccc",
-          }}
-        />
-        <button
-          onClick={handleLogin}
-          style={{
-            marginTop: "1rem",
-            padding: "0.5rem 1rem",
-            backgroundColor: "#00796b",
-            color: "white",
-            border: "none",
-            borderRadius: "0.5rem",
-            cursor: "pointer",
-          }}
-        >
-          Login
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export default function GroundWaterPrediction() {
-  const [username, setUsername] = useState(null);
+  const [user, setUser] = useState(null);
   const [location, setLocation] = useState("");
   const [prediction, setPrediction] = useState("");
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState([]);
+  const [authMode, setAuthMode] = useState("login"); // 'login' or 'signup'
+  const [authForm, setAuthForm] = useState({ email: "", password: "" });
 
   useEffect(() => {
-    const stored = localStorage.getItem("gw-prediction-history");
-    if (stored) setHistory(JSON.parse(stored));
+    const storedUser = JSON.parse(localStorage.getItem("gw-user"));
+    if (storedUser) setUser(storedUser);
+
+    const storedHistory = localStorage.getItem("gw-prediction-history");
+    if (storedHistory) setHistory(JSON.parse(storedHistory));
   }, []);
 
   useEffect(() => {
     localStorage.setItem("gw-prediction-history", JSON.stringify(history));
   }, [history]);
 
+  const handleAuth = () => {
+    const { email, password } = authForm;
+    if (!email || !password) return;
+
+    if (authMode === "signup") {
+      const userData = { email, password };
+      localStorage.setItem(`gw-user-${email}`, JSON.stringify(userData));
+      localStorage.setItem("gw-user", JSON.stringify(userData));
+      setUser(userData);
+    } else {
+      const saved = localStorage.getItem(`gw-user-${email}`);
+      if (!saved) {
+        alert("No user found. Please sign up.");
+        return;
+      }
+      const savedUser = JSON.parse(saved);
+      if (savedUser.password !== password) {
+        alert("Incorrect password");
+        return;
+      }
+      localStorage.setItem("gw-user", JSON.stringify(savedUser));
+      setUser(savedUser);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("gw-user");
+    setUser(null);
+    setAuthForm({ email: "", password: "" });
+    setAuthMode("login");
+  };
+
   const handleSubmit = async () => {
     if (!location) return;
     setLoading(true);
-    const prompt = `Query: ${location} next 7 days ground water level.. just give me an rough prediction need not be accurate to the tee based on recent weather rain and stuff. just use general knowledge. Don't add extra things. just answer with good bad decent etc.`;
+    const prompt = `Query: ${location} next 7 days ground water level.. just give me a rough prediction need not be accurate to the tee based on recent weather rain and stuff. just use general knowledge. Don't add extra things its summer in chennai.`;
+
     try {
       const response = await fetch(
         "https://gemini-backend-uiuz.onrender.com/gemini",
@@ -109,9 +68,7 @@ export default function GroundWaterPrediction() {
         }
       );
 
-      if (!response.ok) {
-        throw new Error("Network response was not ok");
-      }
+      if (!response.ok) throw new Error("Network error");
 
       const data = await response.json();
       setPrediction(data.response);
@@ -119,13 +76,111 @@ export default function GroundWaterPrediction() {
         ...prev.slice(-4),
         { location, response: data.response },
       ]);
-    } catch (error) {
-      console.error("Error fetching prediction:", error);
+    } catch (err) {
+      console.error(err);
       setPrediction("Failed to fetch prediction. Please try again.");
     } finally {
       setLoading(false);
     }
   };
+
+  if (!user) {
+    return (
+      <div
+        style={{
+          height: "100vh",
+          background: "#004d40cc",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <div
+          style={{
+            background: "white",
+            padding: "2rem",
+            borderRadius: "1rem",
+            width: "320px",
+            textAlign: "center",
+            boxShadow: "0 0 20px rgba(0,0,0,0.2)",
+          }}
+        >
+          <h2 style={{ color: "#00796b", marginBottom: "1rem" }}>
+            {authMode === "signup" ? "Sign Up" : "Login"}
+          </h2>
+          <input
+            type="email"
+            placeholder="Email"
+            value={authForm.email}
+            onChange={(e) =>
+              setAuthForm((prev) => ({ ...prev, email: e.target.value }))
+            }
+            style={{
+              width: "100%",
+              padding: "0.5rem",
+              marginBottom: "1rem",
+              borderRadius: "0.5rem",
+              border: "1px solid #ccc",
+            }}
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={authForm.password}
+            onChange={(e) =>
+              setAuthForm((prev) => ({ ...prev, password: e.target.value }))
+            }
+            style={{
+              width: "100%",
+              padding: "0.5rem",
+              borderRadius: "0.5rem",
+              border: "1px solid #ccc",
+            }}
+          />
+          <button
+            onClick={handleAuth}
+            style={{
+              marginTop: "1rem",
+              width: "100%",
+              padding: "0.5rem",
+              backgroundColor: "#00796b",
+              color: "white",
+              border: "none",
+              borderRadius: "0.5rem",
+              cursor: "pointer",
+            }}
+          >
+            {authMode === "signup" ? "Sign Up" : "Login"}
+          </button>
+          <p
+            style={{ marginTop: "1rem", fontSize: "0.9rem", cursor: "pointer" }}
+          >
+            {authMode === "signup" ? (
+              <>
+                Already have an account?{" "}
+                <span
+                  style={{ color: "#00796b", textDecoration: "underline" }}
+                  onClick={() => setAuthMode("login")}
+                >
+                  Login
+                </span>
+              </>
+            ) : (
+              <>
+                Don't have an account?{" "}
+                <span
+                  style={{ color: "#00796b", textDecoration: "underline" }}
+                  onClick={() => setAuthMode("signup")}
+                >
+                  Sign Up
+                </span>
+              </>
+            )}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -136,7 +191,6 @@ export default function GroundWaterPrediction() {
         fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
       }}
     >
-      <AuthForm onAuth={setUsername} />
       <div style={{ maxWidth: "800px", margin: "0 auto", textAlign: "center" }}>
         <h1
           style={{
@@ -148,11 +202,24 @@ export default function GroundWaterPrediction() {
         >
           Ground Water Prediction
         </h1>
-        {username && (
-          <p style={{ color: "#004d40", marginBottom: "1rem" }}>
-            Welcome, {username}!
-          </p>
-        )}
+        <div style={{ marginBottom: "1rem", color: "#004d40" }}>
+          Welcome, {user.email}!
+        </div>
+        <button
+          onClick={handleLogout}
+          style={{
+            marginBottom: "1.5rem",
+            background: "#e53935",
+            color: "white",
+            border: "none",
+            borderRadius: "0.5rem",
+            padding: "0.4rem 1rem",
+            cursor: "pointer",
+          }}
+        >
+          Logout
+        </button>
+
         <div
           style={{
             background: "#ffffff",
